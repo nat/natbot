@@ -131,7 +131,7 @@ CURRENT BROWSER CONTENT:
 <button id=15>Get current location</button>
 <button id=16>Next</button>
 ------------------
-OBJECTIVE: Make a reservation for 4 for dinner at Dorsia in Menlo Park at 8pm
+OBJECTIVE: Make a reservation for 4 for dinner at Dorsia in New York City at 8pm
 CURRENT URL: https://www.opentable.com/
 YOUR COMMAND: 
 TYPESUBMIT 12 "dorsia new york city"
