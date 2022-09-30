@@ -150,7 +150,7 @@ PREVIOUS COMMAND: $previous_command
 YOUR COMMAND:
 """
 
-black_listed_elements = set(["html", "head", "title", "meta", "iframe", "body", "script", "style", "path", "svg", "br", "::marker",])
+ignored_elements = set(["html", "head", "title", "meta", "iframe", "body", "script", "style", "path", "svg", "br", "::marker",])
 
 class Crawler:
 	def __init__(self):
@@ -362,7 +362,7 @@ class Crawler:
 			except:
 				continue
 
-			if node_name in black_listed_elements:
+			if node_name in ignored_elements:
 				continue
 
 			[x, y, width, height] = bounds[cursor]
