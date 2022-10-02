@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 #
 # natbot.py
 #
@@ -7,10 +7,14 @@
 
 from playwright.sync_api import sync_playwright
 import time
-from sys import platform
+from sys import argv, exit, platform
 import openai
 import os
-from pprint import pprint
+
+quiet = False
+if argv[1] == '-q' or argv[1] == '--quiet':
+    quiet = True
+    print("Running in quiet mode (HTML and other content hidden);\nexercise caution when running suggested commands.")
 
 prompt_template = """
 You are an agent controlling a browser. You are given:
@@ -78,7 +82,7 @@ CURRENT BROWSER CONTENT:
 OBJECTIVE: Find a 2 bedroom house for sale in Anchorage AK for under $750k
 CURRENT URL: https://www.google.com/
 YOUR COMMAND: 
-TYPESUBMIT 7 "anchorage redfin"
+TYPESUBMIT 8 "anchorage redfin"
 ==================================================
 
 EXAMPLE 2:
@@ -107,7 +111,7 @@ CURRENT BROWSER CONTENT:
 OBJECTIVE: Make a reservation for 4 at Dorsia at 8pm
 CURRENT URL: https://www.google.com/
 YOUR COMMAND: 
-TYPESUBMIT 7 "dorsia nyc opentable"
+TYPESUBMIT 8 "dorsia nyc opentable"
 ==================================================
 
 EXAMPLE 3:
@@ -539,8 +543,8 @@ if (
 
 	def print_help():
 		print(
-			"(g) to visit url\n(u) scroll up\n(d) scroll dow\n(c) to click\n(t) to type\n" +
-			"(h) to view commands again\n(r) to run suggested command\n(o) change objective"
+			"(g) to visit url\n(u) scroll up\n(d) scroll down\n(c) to click\n(t) to type\n" +
+			"(h) to view commands again\n(r/enter) to run suggested command\n(o) change objective"
 		)
 
 	def get_gpt_command(objective, url, previous_command, browser_content):
@@ -586,41 +590,46 @@ if (
 	gpt_cmd = ""
 	prev_cmd = ""
 	_crawler.go_to_page("google.com")
-	while True:
-		browser_content = "\n".join(_crawler.crawl())
-		prev_cmd = gpt_cmd
-		gpt_cmd = get_gpt_command(objective, _crawler.page.url, prev_cmd, browser_content)
-		gpt_cmd = gpt_cmd.strip()
+	try:
+		while True:
+			browser_content = "\n".join(_crawler.crawl())
+			prev_cmd = gpt_cmd
+			gpt_cmd = get_gpt_command(objective, _crawler.page.url, prev_cmd, browser_content)
+			gpt_cmd = gpt_cmd.strip()
 
-		print("URL: " + _crawler.page.url)
-		print("Objective: " + objective)
-		print("----------------\n" + browser_content + "\n----------------\n")
-		if len(gpt_cmd) > 0:
-			print("Suggested command: " + gpt_cmd)
+			if not quiet:
+				print("URL: " + _crawler.page.url)
+				print("Objective: " + objective)
+				print("----------------\n" + browser_content + "\n----------------\n")
+			if len(gpt_cmd) > 0:
+				print("Suggested command: " + gpt_cmd)
 
 
-		command = input()
-		if command == "r" or command == "":
-			run_cmd(gpt_cmd)
-		elif command == "g":
-			url = input("URL:")
-			_crawler.go_to_page(url)
-		elif command == "u":
-			_crawler.scroll("up")
-			time.sleep(1)
-		elif command == "d":
-			_crawler.scroll("down")
-			time.sleep(1)
-		elif command == "c":
-			id = input("id:")
-			_crawler.click(id)
-			time.sleep(1)
-		elif command == "t":
-			id = input("id:")
-			text = input("text:")
-			_crawler.type(id, text)
-			time.sleep(1)
-		elif command == "o":
-			objective = input("Objective:")
-		else:
-			print_help()
+			command = input()
+			if command == "r" or command == "":
+				run_cmd(gpt_cmd)
+			elif command == "g":
+				url = input("URL:")
+				_crawler.go_to_page(url)
+			elif command == "u":
+				_crawler.scroll("up")
+				time.sleep(1)
+			elif command == "d":
+				_crawler.scroll("down")
+				time.sleep(1)
+			elif command == "c":
+				id = input("id:")
+				_crawler.click(id)
+				time.sleep(1)
+			elif command == "t":
+				id = input("id:")
+				text = input("text:")
+				_crawler.type(id, text)
+				time.sleep(1)
+			elif command == "o":
+				objective = input("Objective:")
+			else:
+				print_help()
+	except KeyboardInterrupt:
+		print("\n[!] Ctrl+C detected, exiting gracefully.")
+		exit(0)
