@@ -64,29 +64,4 @@ if (__name__ == "__main__"):
         if len(cmd) > 0:
             print("Suggested command: " + cmd)
 
-        command = input()
-        if command == "r" or command == "":
-            run_cmd(cmd)
-        elif command == "g":
-            url = input("URL:")
-            _crawler.go_to_page(url)
-        elif command == "u":
-            _crawler.scroll("up")
-            time.sleep(1)
-        elif command == "d":
-            _crawler.scroll("down")
-            time.sleep(1)
-        elif command == "c":
-            id = input("id:")
-            _crawler.click(id)
-            time.sleep(1)
-        elif command == "t":
-            id = input("id:")
-            text = input("text:")
-            _crawler.type(id, text)
-            time.sleep(1)
-        elif command == "o":
-            objective = input("Objective:")
-        else:
-            run_cmd(command)
-            cmd = command
+        run_cmd(cmd)

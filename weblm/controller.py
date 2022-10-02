@@ -62,7 +62,7 @@ class Controller:
             str: the most likely option from `options`
         """
         num_options = len(options)
-        with Pool(num_options) as pp:
+        with Pool(min(num_options, 16)) as pp:
             _lh = pp.map(_fn, zip(options, [prompt] * num_options, [self] * num_options))
         return max(_lh, key=lambda x: x[0])[1]
 
@@ -158,10 +158,11 @@ class Controller:
                          "\n\t(s) save example, accept, and continue"
                          "\n\t(enter a new command) type your own command to replace the model's suggestion"
                          "\nType a choice and then press enter:")
-        if response == "s":
-            self._save_example(state=self._construct_state(objective, url, pruned_elements), command=cmd)
-        elif response != "":
+        if response != "" and response != "s":
             cmd = response
+
+        if response == "s" or response != "":
+            self._save_example(state=self._construct_state(objective, url, pruned_elements), command=cmd)
 
         self.previous_commands.append(cmd)
 
