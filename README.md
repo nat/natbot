@@ -1,6 +1,6 @@
 # natbot
 
-Drive a browser with GPT-3
+Drive a browser with GPT-3 or [Text-Generator.io](https://text-generator.io)
 
 Here's a demo: https://twitter.com/natfriedman/status/1575631194032549888
 
