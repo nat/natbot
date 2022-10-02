@@ -12,3 +12,19 @@ Lots of ideas for improvement:
 - Let the agent use multiple tabs and switch between them
 
 Improvements welcome!
+
+
+### Running
+
+#### Setup
+
+```
+pip install -r requirements.txt
+playwright install
+```
+
+#### Run
+
+```
+python natbot.py
+```
