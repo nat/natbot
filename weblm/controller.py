@@ -152,8 +152,11 @@ class Controller:
     def _shorten_prompt(self, objective, url, elements, examples, *rest_of_prompt):
         state = self._construct_state(objective, url, elements)
         prompt = self._construct_prompt(state, examples)
-
         j = 0
+
+        if len(self.co.tokenize(prompt + "".join(rest_of_prompt))) - len(self.co.tokenize(state)) > 2020:
+            j += 1
+
         while len(self.co.tokenize(prompt + "".join(rest_of_prompt))) > 2020:
             state = self._construct_state(objective, url, elements)
             prompt = self._construct_prompt(state, examples[j:])
