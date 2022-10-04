@@ -6,7 +6,6 @@
 #
 
 import os
-import time
 from multiprocessing import Pool
 
 import cohere
@@ -23,30 +22,6 @@ if (__name__ == "__main__"):
         print("(g) to visit url\n(u) scroll up\n(d) scroll dow\n(c) to click\n(t) to type\n" +
               "(h) to view commands again\n(r) to run suggested command\n(o) change objective")
 
-    def run_cmd(cmd):
-        print("cmd", cmd)
-        cmd = cmd.split("\n")[0]
-
-        if cmd.startswith("SCROLL UP"):
-            _crawler.scroll("up")
-        elif cmd.startswith("SCROLL DOWN"):
-            _crawler.scroll("down")
-        elif cmd.startswith("click"):
-            commasplit = cmd.split(",")
-            id = commasplit[0].split(" ")[2]
-            _crawler.click(id)
-        elif cmd.startswith("type"):
-            spacesplit = cmd.split(" ")
-            id = spacesplit[2]
-            text = spacesplit[3:]
-            text = " ".join(text)
-            # Strip leading and trailing double quotes
-            text = text[1:-1]
-            text += '\n'
-            _crawler.type(id, text)
-
-        time.sleep(2)
-
     objective = "Make a reservation for 2 at 7pm at bistro vida in menlo park"
     print("\nWelcome to natbot! What is your objective?")
     i = input()
@@ -59,9 +34,9 @@ if (__name__ == "__main__"):
     _crawler.go_to_page("google.com")
     while True:
         content = _crawler.crawl()
-        cmd = _controller.step(objective, _crawler.page.url, content).strip()
+        cmd = _controller.cli_step(objective, _crawler.page.url, content).strip()
 
         if len(cmd) > 0:
             print("Suggested command: " + cmd)
 
-        run_cmd(cmd)
+        _crawler.run_cmd(cmd)
