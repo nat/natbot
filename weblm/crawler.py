@@ -1,4 +1,5 @@
 import asyncio
+import json
 import time
 from sys import platform
 
@@ -716,7 +717,7 @@ class AsyncCrawler:
 
     async def run_cmd(self, cmd):
         print("cmd", cmd)
-        cmd = cmd.split("\n")[0]
+        cmd = replace_special_fields(cmd.strip())
 
         if cmd.startswith("SCROLL UP"):
             await self.scroll("up")
@@ -739,3 +740,13 @@ class AsyncCrawler:
             raise Exception(f"Invalid command: {cmd}")
 
         time.sleep(2)
+
+
+def replace_special_fields(cmd):
+    with open("specials.json", "r") as fd:
+        specials = json.load(fd)
+
+    for k, v in specials.items():
+        cmd = cmd.replace(k, v)
+
+    return cmd
