@@ -14,12 +14,14 @@ from .crawler import AsyncCrawler
 
 co = cohere.Client(os.environ.get("COHERE_KEY"))
 
+MSG_LEN_LIMIT = 1800
+
 
 def chunk_message_for_sending(msg):
     chunks = []
     tmp_chunk = ""
     for line in msg.split("\n"):
-        if len(tmp_chunk + line) > 2000:
+        if len(tmp_chunk + line) > MSG_LEN_LIMIT:
             chunks.append(tmp_chunk)
             tmp_chunk = line
         else:
@@ -71,10 +73,15 @@ class MyClient(discord.Client):
         if objective == "cancel":
             del self.sessions[message.id]
             return
+        elif objective == "success":
+            controller.success()
+            del self.sessions[message.channel.starter_message.id]
+            msg = await message.channel.send("🎉🎉🎉")
+            await msg.edit(suppress=True)
+            return
 
         while True:
             content = await crawler.crawl()
-            print("AIDAN", content)
 
             async with message.channel.typing():
                 if not controller.is_running():
@@ -108,6 +115,12 @@ class MyClient(discord.Client):
         if objective == "cancel":
             del self.sessions[message.channel.starter_message.id]
             return
+        elif objective == "success":
+            controller.success()
+            del self.sessions[message.channel.starter_message.id]
+            msg = await message.channel.send("🎉🎉🎉")
+            await msg.edit(suppress=True)
+            return
 
         while True:
             content = await crawler.crawl()
@@ -139,6 +152,12 @@ class MyClient(discord.Client):
         if objective == "cancel":
             del self.sessions[message.author.id]
             return
+        elif objective == "success":
+            controller.success()
+            del self.sessions[message.channel.starter_message.id]
+            msg = await message.channel.send("🎉🎉🎉")
+            await msg.edit(suppress=True)
+            return
 
         while True:
             content = await crawler.crawl()
@@ -163,17 +182,19 @@ class MyClient(discord.Client):
                     return
 
     async def on_message(self, message):
-        print(message)
-        if isinstance(
-                message.channel,
-                discord.TextChannel) and message.channel.id == 1026557845308723212 and message.author != self.user:
-            await self.respond_to_message(message)
-        elif isinstance(message.channel, discord.DMChannel) and message.author != self.user:
-            await self.respond_to_dm(message)
-        elif isinstance(
-                message.channel,
-                discord.Thread) and message.channel.parent.id == 1026557845308723212 and message.author != self.user:
-            await self.respond_in_thread(message)
+        try:
+            print(message)
+            if isinstance(
+                    message.channel,
+                    discord.TextChannel) and message.channel.id == 1026557845308723212 and message.author != self.user:
+                await self.respond_to_message(message)
+            elif isinstance(message.channel, discord.DMChannel) and message.author != self.user:
+                await self.respond_to_dm(message)
+            elif isinstance(message.channel, discord.Thread
+                           ) and message.channel.parent.id == 1026557845308723212 and message.author != self.user:
+                await self.respond_in_thread(message)
+        except Exception as e:
+            print(f"Exception caught: {e}")
 
 
 async def main():

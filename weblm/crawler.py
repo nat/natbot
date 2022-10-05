@@ -191,8 +191,10 @@ class Crawler:
 
             is_parent_desc_anchor, anchor_id = hash_tree[parent_id_str]
 
+            element_attributes = find_attributes(attributes[node_id], ["role"])
+
             # even if the anchor is nested in another anchor, we set the "root" for all descendants to be ::Self
-            if node_name == tag:
+            if node_name == tag or element_attributes.get("role") == tag:
                 value = (True, node_id)
             elif (is_parent_desc_anchor):  # reuse the parent's anchor_id (which could be much higher in the tree)
                 value = (True, anchor_id)
@@ -245,7 +247,7 @@ class Crawler:
 
             # inefficient to grab the same set of keys for kinds of objects but its fine for now
             element_attributes = find_attributes(attributes[index],
-                                                 ["type", "placeholder", "aria-label", "title", "alt"])
+                                                 ["type", "placeholder", "aria-label", "title", "alt", "role"])
 
             ancestor_exception = is_ancestor_of_anchor or is_ancestor_of_button
             ancestor_node_key = (None if not ancestor_exception else
@@ -258,9 +260,12 @@ class Crawler:
                     continue
                 ancestor_node.append({"type": "type", "value": text})
             else:
-                if (node_name == "input" and element_attributes.get("type") == "submit") or node_name == "button":
+                if (node_name == "input" and element_attributes.get("type")
+                        == "submit") or node_name == "button" or element_attributes.get("role") == "button":
                     node_name = "button"
                     element_attributes.pop("type", None)  # prevent [button ... (button)..]
+                if element_attributes.get("role") == "textbox":
+                    node_name = "input"
 
                 for key in element_attributes:
                     if ancestor_exception:
@@ -357,7 +362,7 @@ class Crawler:
 
     def run_cmd(self, cmd):
         print("cmd", cmd)
-        cmd = cmd.split("\n")[0]
+        cmd = replace_special_fields(cmd.strip())
 
         if cmd.startswith("SCROLL UP"):
             self.scroll("up")
@@ -488,6 +493,7 @@ class AsyncCrawler:
         node_types = nodes["nodeType"]
         node_names = nodes["nodeName"]
         is_clickable = set(nodes["isClickable"]["index"])
+        print(nodes.keys())
 
         text_value = nodes["textValue"]
         text_value_index = text_value["index"]
@@ -551,8 +557,10 @@ class AsyncCrawler:
 
             is_parent_desc_anchor, anchor_id = hash_tree[parent_id_str]
 
+            element_attributes = find_attributes(attributes[node_id], ["role"])
+
             # even if the anchor is nested in another anchor, we set the "root" for all descendants to be ::Self
-            if node_name == tag:
+            if node_name == tag or element_attributes.get("role") == tag:
                 value = (True, node_id)
             elif (is_parent_desc_anchor):  # reuse the parent's anchor_id (which could be much higher in the tree)
                 value = (True, anchor_id)
@@ -605,7 +613,7 @@ class AsyncCrawler:
 
             # inefficient to grab the same set of keys for kinds of objects but its fine for now
             element_attributes = find_attributes(attributes[index],
-                                                 ["type", "placeholder", "aria-label", "title", "alt"])
+                                                 ["type", "placeholder", "aria-label", "title", "alt", "role"])
 
             ancestor_exception = is_ancestor_of_anchor or is_ancestor_of_button
             ancestor_node_key = (None if not ancestor_exception else
@@ -618,9 +626,12 @@ class AsyncCrawler:
                     continue
                 ancestor_node.append({"type": "type", "value": text})
             else:
-                if (node_name == "input" and element_attributes.get("type") == "submit") or node_name == "button":
+                if (node_name == "input" and element_attributes.get("type")
+                        == "submit") or node_name == "button" or element_attributes.get("role") == "button":
                     node_name = "button"
                     element_attributes.pop("type", None)  # prevent [button ... (button)..]
+                if element_attributes.get("role") == "textbox":
+                    node_name = "input"
 
                 for key in element_attributes:
                     if ancestor_exception:
