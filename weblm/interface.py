@@ -1,6 +1,7 @@
 import asyncio
 import chunk
 import os
+import traceback
 from typing import Dict, Tuple
 
 import cohere
@@ -154,7 +155,7 @@ class MyClient(discord.Client):
             return
         elif objective == "success":
             controller.success()
-            del self.sessions[message.channel.starter_message.id]
+            del self.sessions[message.author.id]
             msg = await message.channel.send("🎉🎉🎉")
             await msg.edit(suppress=True)
             return
@@ -193,8 +194,8 @@ class MyClient(discord.Client):
             elif isinstance(message.channel, discord.Thread
                            ) and message.channel.parent.id == 1026557845308723212 and message.author != self.user:
                 await self.respond_in_thread(message)
-        except Exception as e:
-            print(f"Exception caught: {e}")
+        except Exception:
+            print(f"Exception caught:\n{traceback.format_exc()}")
 
 
 async def main():

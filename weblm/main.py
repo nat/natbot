@@ -34,7 +34,7 @@ if (__name__ == "__main__"):
     _crawler.go_to_page("google.com")
     while True:
         content = _crawler.crawl()
-        cmd = _controller.cli_step(_crawler.page.url, content).strip()
+        cmd = str(_controller.cli_step(_crawler.page.url, content)).strip()
 
         if len(cmd) > 0:
             print("Suggested command: " + cmd)

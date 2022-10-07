@@ -26,8 +26,12 @@ class Crawler:
 
     def __init__(self):
         self.browser = sync_playwright().start().chromium.launch(headless=False,)
+        self.context = self.browser.new_context(
+            user_agent=
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/105.0.0.0 Safari/537.36"
+        )
 
-        self.page = self.browser.new_page()
+        self.page = self.context.new_page()
         self.page.set_viewport_size({"width": 1280, "height": 1080})
 
     def go_to_page(self, url):
@@ -237,6 +241,7 @@ class Crawler:
             elem_right_bound = x + width
             elem_lower_bound = y + height
 
+            # comment this bit out to process the whole thing
             partially_is_in_viewport = (elem_left_bound < win_right_bound and elem_right_bound >= win_left_bound and
                                         elem_top_bound < win_lower_bound and elem_lower_bound >= win_upper_bound)
 
@@ -392,7 +397,12 @@ class AsyncCrawler:
 
     async def _init_browser(self):
         self.browser = await self.playwright.chromium.launch(headless=True,)
-        self.page = await self.browser.new_page()
+        self.context = await self.browser.new_context(
+            user_agent=
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/105.0.0.0 Safari/537.36"
+        )
+
+        self.page = await self.context.new_page()
         await self.page.set_viewport_size({"width": 1280, "height": 1080})
 
     async def go_to_page(self, url):
@@ -455,8 +465,8 @@ class AsyncCrawler:
         win_height = await page.evaluate("window.screen.height")
         win_right_bound = win_left_bound + win_width
         win_lower_bound = win_upper_bound + win_height
-        document_offset_height = await page.evaluate("document.body.offsetHeight")
-        document_scroll_height = await page.evaluate("document.body.scrollHeight")
+        # document_offset_height = await page.evaluate("document.body.offsetHeight")
+        # document_scroll_height = await page.evaluate("document.body.scrollHeight")
 
         #		percentage_progress_start = (win_upper_bound / document_scroll_height) * 100
         #		percentage_progress_end = (
@@ -603,11 +613,11 @@ class AsyncCrawler:
             elem_right_bound = x + width
             elem_lower_bound = y + height
 
-            partially_is_in_viewport = (elem_left_bound < win_right_bound and elem_right_bound >= win_left_bound and
-                                        elem_top_bound < win_lower_bound and elem_lower_bound >= win_upper_bound)
+            # partially_is_in_viewport = (elem_left_bound < win_right_bound and elem_right_bound >= win_left_bound and
+            #                             elem_top_bound < win_lower_bound and elem_lower_bound >= win_upper_bound)
 
-            if not partially_is_in_viewport:
-                continue
+            # if not partially_is_in_viewport:
+            #     continue
 
             meta_data = []
 
