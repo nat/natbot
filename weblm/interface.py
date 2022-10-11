@@ -87,9 +87,9 @@ class MyClient(discord.Client):
             async with message.channel.typing():
                 if not controller.is_running():
                     print("Controller not yet running")
-                    response = controller.dialogue_step(crawler.page.url, content)
+                    response = controller.step(crawler.page.url, content)
                 else:
-                    response = controller.dialogue_step(crawler.page.url, content, response=objective)
+                    response = controller.step(crawler.page.url, content, response=objective)
 
                 print(response)
 
@@ -130,9 +130,9 @@ class MyClient(discord.Client):
             async with message.channel.typing():
                 if not controller.is_running():
                     print("Controller not yet running")
-                    response = controller.dialogue_step(crawler.page.url, content)
+                    response = controller.step(crawler.page.url, content)
                 else:
-                    response = controller.dialogue_step(crawler.page.url, content, response=objective)
+                    response = controller.step(crawler.page.url, content, response=objective)
 
                 print(response)
 
@@ -167,9 +167,9 @@ class MyClient(discord.Client):
             async with message.channel.typing():
                 if not controller.is_running():
                     print("Controller not yet running")
-                    response = controller.dialogue_step(crawler.page.url, content)
+                    response = controller.step(crawler.page.url, content)
                 else:
-                    response = controller.dialogue_step(crawler.page.url, content, response=objective)
+                    response = controller.step(crawler.page.url, content, response=objective)
 
                 print(response)
 

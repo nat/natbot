@@ -251,8 +251,8 @@ class Crawler:
             meta_data = []
 
             # inefficient to grab the same set of keys for kinds of objects but its fine for now
-            element_attributes = find_attributes(attributes[index],
-                                                 ["type", "placeholder", "aria-label", "title", "alt", "role"])
+            element_attributes = find_attributes(
+                attributes[index], ["type", "placeholder", "aria-label", "name", "title", "alt", "role", "value"])
 
             ancestor_exception = is_ancestor_of_anchor or is_ancestor_of_button
             ancestor_node_key = (None if not ancestor_exception else
@@ -622,8 +622,8 @@ class AsyncCrawler:
             meta_data = []
 
             # inefficient to grab the same set of keys for kinds of objects but its fine for now
-            element_attributes = find_attributes(attributes[index],
-                                                 ["type", "placeholder", "aria-label", "title", "alt", "role"])
+            element_attributes = find_attributes(
+                attributes[index], ["type", "placeholder", "aria-label", "name", "title", "alt", "role", "value"])
 
             ancestor_exception = is_ancestor_of_anchor or is_ancestor_of_button
             ancestor_node_key = (None if not ancestor_exception else

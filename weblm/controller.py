@@ -176,7 +176,7 @@ class Controller:
                template: str,
                options: List[Dict[str, str]],
                return_likelihoods: str = "ALL",
-               topk: int = 1) -> List[Dict[str, str]]:
+               topk: int = 1) -> List[Tuple[int, Dict[str, str]]]:
         """Choose the most likely continuation of `prompt` from a set of `options`.
 
         Args:
@@ -192,7 +192,7 @@ class Controller:
                 _fn,
                 zip(options, [template.format(**option) for option in options], [self] * num_options,
                     [return_likelihoods] * num_options))
-        return [x[1] for x in sorted(_lh, key=lambda x: x[0], reverse=True)[:topk]]
+        return sorted(_lh, key=lambda x: x[0], reverse=True)[:topk]
 
     def choose_element(self,
                        template: str,
@@ -211,7 +211,7 @@ class Controller:
             template_tmp = template.replace("elements", "\n".join(item["elements"] for item in group))
             options_tmp = [{"id": item["id"]} for item in group]
 
-            choice = self.choose(template_tmp, options_tmp, topk=topk)
+            choice = [x[1] for x in self.choose(template_tmp, options_tmp, topk=topk)]
             chosen_elements = []
             for x in choice:
                 chosen_elements.append(list(filter(lambda y: y["id"] == x["id"], group))[0])
@@ -222,9 +222,12 @@ class Controller:
         else:
             return self.choose_element(template, choices, group_size, topk)
 
-    def gather_examples(self, state: str, topk: int = 5) -> str:
+    def gather_examples(self, state: str, topk: int = 5) -> List[str]:
         with open("examples.json", "r") as fd:
             examples = json.load(fd)
+
+        if len(examples) == 0:
+            return []
 
         embeds, examples = zip(*examples)
         embeds = np.array(embeds)
@@ -329,6 +332,9 @@ class Controller:
 
     def pick_action(self, url: str, page_elements: List[str], response: str = None):
 
+        if self._step not in [DialogueState.Action, DialogueState.ActionFeedback]:
+            return
+
         if self._prioritized_elements is None:
             prioritization = prioritization_template
             prioritization = prioritization.replace("$objective", self.objective)
@@ -337,7 +343,7 @@ class Controller:
                 "element": x
             } for x in page_elements],
                                                      topk=len(page_elements))
-            self._prioritized_elements = [x["element"] for x in self._prioritized_elements]
+            self._prioritized_elements = [x[1]["element"] for x in self._prioritized_elements]
             print(self._prioritized_elements)
 
         state = self._construct_state(url, self._prioritized_elements)
@@ -348,6 +354,7 @@ class Controller:
         # type_elements = list(filter(lambda x: "input" in x, page_elements))
 
         if self._step == DialogueState.Action:
+            action = " click"
             if any("input" in x for x in page_elements):
                 # click_prompt = "\n".join(click_elements)
                 # type_prompt = "\n".join(type_elements)
@@ -372,13 +379,19 @@ class Controller:
                             # "page_elements": type_prompt
                         },
                     ],
-                )[0]["action"]
+                    topk=2)
+                print(action, (action[0][0] - action[1][0]) / -action[1][0])
 
-                self._action = action
-                self._step = DialogueState.ActionFeedback
-                return Prompt(eval(f'f"""{user_prompt_1}"""'))
+                # if the model is confident enough, just assume the suggested action is correct
+                if (action[0][0] - action[1][0]) / -action[1][0] > 1.:
+                    action = action[0][1]["action"]
+                else:
+                    action = action[0][1]["action"]
+                    self._action = action
+                    self._step = DialogueState.ActionFeedback
+                    return Prompt(eval(f'f"""{user_prompt_1}"""'))
 
-            self._action = " click"
+            self._action = action
             self._step = DialogueState.Command
         elif self._step == DialogueState.ActionFeedback:
             if response == "y":
@@ -415,7 +428,7 @@ class Controller:
                     text = max(self.co.generate(prompt=prompt + self._action + chosen_element,
                                                 model="xlarge",
                                                 temperature=0.5,
-                                                num_generations=1,
+                                                num_generations=5,
                                                 max_tokens=num_tokens,
                                                 stop_sequences=["\n"],
                                                 return_likelihoods="GENERATION").generations,
@@ -491,7 +504,7 @@ class Controller:
                 return Prompt(f"Invalid command '{self._cmd}'. Must match regex '{cmd_pattern}'. Try again...")
 
             if response == "s" or response != "y":
-                self._save_example(state=self._construct_state(url, pruned_elements), command=self._cmd)
+                self._save_example(state=self._construct_state(url, pruned_elements[:50]), command=self._cmd)
 
         self.moments.append((self._construct_state(url, pruned_elements), self._cmd))
         self.previous_commands.append(self._cmd)
@@ -500,27 +513,7 @@ class Controller:
         self.reset_state()
         return cmd
 
-    def cli_step(self, url: str, page_elements: List[str]):
-        self._step = DialogueState.Action if self._step == DialogueState.Unset else self._step
-
-        action_or_prompt = self.pick_action(url, page_elements)
-        while isinstance(action_or_prompt, Prompt):
-            response = input(str(action_or_prompt))
-            action_or_prompt = self.pick_action(url, page_elements, response)
-
-        if "click" in self._action:
-            pruned_elements = list(filter(lambda x: "link" in x or "button" in x, page_elements))
-        elif "type" in self._action:
-            pruned_elements = list(filter(lambda x: "input" in x, page_elements))
-
-        command_or_prompt = self.generate_command(url, page_elements, pruned_elements)
-        while isinstance(command_or_prompt, Prompt):
-            response = input(str(command_or_prompt))
-            command_or_prompt = self.generate_command(url, page_elements, pruned_elements, response)
-
-        return command_or_prompt
-
-    def dialogue_step(self, url: str, page_elements: List[str], response: str = None):
+    def step(self, url: str, page_elements: List[str], response: str = None) -> Union[Prompt, Command]:
         self._step = DialogueState.Action if self._step == DialogueState.Unset else self._step
 
         action_or_prompt = self.pick_action(url, page_elements, response)
@@ -534,4 +527,3 @@ class Controller:
             pruned_elements = list(filter(lambda x: "input" in x, self._prioritized_elements))
 
         return self.generate_command(url, pruned_elements, response)
-        # reset state and return the decided upon command

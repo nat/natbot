@@ -10,33 +10,46 @@ from multiprocessing import Pool
 
 import cohere
 
-from .controller import Controller
+from .controller import Command, Controller, Prompt
 from .crawler import Crawler
 
 co = cohere.Client(os.environ.get("COHERE_KEY"))
 
 if (__name__ == "__main__"):
-    _crawler = Crawler()
 
-    def print_help():
-        print("(g) to visit url\n(u) scroll up\n(d) scroll dow\n(c) to click\n(t) to type\n" +
-              "(h) to view commands again\n(r) to run suggested command\n(o) change objective")
+    def reset():
+        _crawler = Crawler()
 
-    objective = "Make a reservation for 2 at 7pm at bistro vida in menlo park"
-    print("\nWelcome to natbot! What is your objective?")
-    i = input()
-    if len(i) > 0:
-        objective = i
+        def print_help():
+            print("(g) to visit url\n(u) scroll up\n(d) scroll dow\n(c) to click\n(t) to type\n" +
+                  "(h) to view commands again\n(r) to run suggested command\n(o) change objective")
 
-    _controller = Controller(co, objective)
+        objective = "Make a reservation for 2 at 7pm at bistro vida in menlo park"
+        print("\nWelcome to natbot! What is your objective?")
+        i = input()
+        if len(i) > 0:
+            objective = i
 
-    cmd = None
-    _crawler.go_to_page("google.com")
+        _controller = Controller(co, objective)
+        return _crawler, _controller
+
+    crawler, controller = reset()
+
+    response = None
+    crawler.go_to_page("google.com")
     while True:
-        content = _crawler.crawl()
-        cmd = str(_controller.cli_step(_crawler.page.url, content)).strip()
+        if response == "cancel":
+            crawler, controller = reset()
+        elif response == "success":
+            controller.success()
+            crawler, controller = reset()
 
-        if len(cmd) > 0:
-            print("Suggested command: " + cmd)
+        content = crawler.crawl()
+        response = controller.step(crawler.page.url, content, response)
 
-        _crawler.run_cmd(cmd)
+        print(response)
+
+        if isinstance(response, Command):
+            crawler.run_cmd(str(response))
+        elif isinstance(response, Prompt):
+            response = input(str(response))
