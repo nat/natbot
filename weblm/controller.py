@@ -12,6 +12,8 @@ import cohere
 import numpy as np
 
 MAX_SEQ_LEN = 2000
+TYPEABLE = ["input", "select", "option"]
+CLICKABLE = ["link", "button"]
 
 prompt_template = """Given:
     (1) an objective that you are trying to achieve
@@ -167,6 +169,7 @@ class Controller:
         self._cmd = None
         self._chosen_elements: List[Dict[str, str]] = []
         self._prioritized_elements = None
+        self._prioritized_elements_hash = None
 
     def success(self):
         for state, command in self.moments:
@@ -250,7 +253,7 @@ class Controller:
         state = state.replace("$previous_commands", self._construct_prev_cmds())
         return state.replace("$browser_content", "\n".join(page_elements))
 
-    def _construct_prompt(self, state: str, examples: str) -> str:
+    def _construct_prompt(self, state: str, examples: List[str]) -> str:
         prompt = prompt_template
         prompt = prompt.replace("$examples", "\n\n".join(examples))
         return prompt.replace("$state", state)
@@ -330,41 +333,32 @@ class Controller:
 
         return state, prompt
 
+    def _generate_prioritization(self, page_elements: List[str]):
+        prioritization = prioritization_template
+        prioritization = prioritization.replace("$objective", self.objective)
+
+        self._prioritized_elements = self.choose(prioritization, [{
+            "element": x
+        } for x in page_elements],
+                                                 topk=len(page_elements))
+        self._prioritized_elements = [x[1]["element"] for x in self._prioritized_elements]
+        self._prioritized_elements_hash = hash(frozenset(page_elements))
+        self._step = DialogueState.Action
+        print(self._prioritized_elements)
+
     def pick_action(self, url: str, page_elements: List[str], response: str = None):
 
         if self._step not in [DialogueState.Action, DialogueState.ActionFeedback]:
             return
 
-        if self._prioritized_elements is None:
-            prioritization = prioritization_template
-            prioritization = prioritization.replace("$objective", self.objective)
-
-            self._prioritized_elements = self.choose(prioritization, [{
-                "element": x
-            } for x in page_elements],
-                                                     topk=len(page_elements))
-            self._prioritized_elements = [x[1]["element"] for x in self._prioritized_elements]
-            print(self._prioritized_elements)
-
         state = self._construct_state(url, self._prioritized_elements)
         examples = self.gather_examples(state)
         prompt = self._construct_prompt(state, examples)
 
-        # click_elements = list(filter(lambda x: "link" in x or "button" in x, page_elements))
-        # type_elements = list(filter(lambda x: "input" in x, page_elements))
-
         if self._step == DialogueState.Action:
             action = " click"
-            if any("input" in x for x in page_elements):
-                # click_prompt = "\n".join(click_elements)
-                # type_prompt = "\n".join(type_elements)
-                adtl_prompt_buffer = 0
-                # adtl_prompt_buffer = max(len(self.co.tokenize(click_prompt)), len(self.co.tokenize(type_prompt)))
-
-                state, prompt = self._shorten_prompt(url,
-                                                     self._prioritized_elements,
-                                                     examples,
-                                                     target=MAX_SEQ_LEN - adtl_prompt_buffer)
+            if any(y in x for y in TYPEABLE for x in page_elements):
+                state, prompt = self._shorten_prompt(url, self._prioritized_elements, examples, target=MAX_SEQ_LEN)
 
                 print(state)
                 action = self.choose(
@@ -499,11 +493,11 @@ class Controller:
             elif response != "y" and response != "s":
                 self._cmd = response
 
-            cmd_pattern = r"(click|type) (link|button|input) [\d]+( \"\w+\")?"
+            cmd_pattern = r"(click|type) (link|button|input|select) [\d]+( \"\w+\")?"
             if not re.match(cmd_pattern, self._cmd):
                 return Prompt(f"Invalid command '{self._cmd}'. Must match regex '{cmd_pattern}'. Try again...")
 
-            if response == "s" or response != "y":
+            if response == "s":
                 self._save_example(state=self._construct_state(url, pruned_elements[:50]), command=self._cmd)
 
         self.moments.append((self._construct_state(url, pruned_elements), self._cmd))
@@ -516,14 +510,18 @@ class Controller:
     def step(self, url: str, page_elements: List[str], response: str = None) -> Union[Prompt, Command]:
         self._step = DialogueState.Action if self._step == DialogueState.Unset else self._step
 
+        if self._prioritized_elements is None or self._prioritized_elements_hash != hash(frozenset(page_elements)):
+            self._generate_prioritization(page_elements)
+
         action_or_prompt = self.pick_action(url, page_elements, response)
 
         if isinstance(action_or_prompt, Prompt):
             return action_or_prompt
 
         if "click" in self._action:
-            pruned_elements = list(filter(lambda x: "link" in x or "button" in x, self._prioritized_elements))
+            pruned_elements = list(filter(lambda x: any(x.startswith(y) for y in CLICKABLE),
+                                          self._prioritized_elements))
         elif "type" in self._action:
-            pruned_elements = list(filter(lambda x: "input" in x, self._prioritized_elements))
+            pruned_elements = list(filter(lambda x: any(x.startswith(y) for y in TYPEABLE), self._prioritized_elements))
 
         return self.generate_command(url, pruned_elements, response)

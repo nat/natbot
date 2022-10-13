@@ -21,6 +21,8 @@ black_listed_elements = set([
     "::marker",
 ])
 
+URL_PATTERN = r"https?:\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_\+.~#?&//=]*)"
+
 
 class Crawler:
 
@@ -152,17 +154,12 @@ class Crawler:
         child_nodes = {}
         elements_in_view_port = []
 
-        anchor_ancestry = {"-1": (False, None)}
-        button_ancestry = {"-1": (False, None)}
-
         def convert_name(node_name, has_click_handler):
             if node_name == "a":
                 return "link"
-            if node_name == "input":
-                return "input"
-            if node_name == "img":
-                return "img"
-            if (node_name == "button" or has_click_handler):  # found pages that needed this quirk
+            elif node_name in ["select", "img", "input"]:
+                return node_name
+            elif (node_name in "button" or has_click_handler):  # found pages that needed this quirk
                 return "button"
             else:
                 return "text"
@@ -198,7 +195,7 @@ class Crawler:
             element_attributes = find_attributes(attributes[node_id], ["role"])
 
             # even if the anchor is nested in another anchor, we set the "root" for all descendants to be ::Self
-            if node_name == tag or element_attributes.get("role") == tag:
+            if node_name in tag or element_attributes.get("role") in tag:
                 value = (True, node_id)
             elif (is_parent_desc_anchor):  # reuse the parent's anchor_id (which could be much higher in the tree)
                 value = (True, anchor_id)
@@ -212,18 +209,31 @@ class Crawler:
 
             return value
 
+        anchor_ancestry = {"-1": (False, None)}
+        button_ancestry = {"-1": (False, None)}
+        select_ancestry = {"-1": (False, None)}
+
         for index, node_name_index in enumerate(node_names):
             node_parent = parent[index]
             node_name = strings[node_name_index].lower()
 
-            is_ancestor_of_anchor, anchor_id = add_to_hash_tree(anchor_ancestry, "a", index, node_name, node_parent)
+            is_ancestor_of_anchor, anchor_id = add_to_hash_tree(anchor_ancestry, ["a"], index, node_name, node_parent)
 
-            is_ancestor_of_button, button_id = add_to_hash_tree(button_ancestry, "button", index, node_name,
+            is_ancestor_of_button, button_id = add_to_hash_tree(button_ancestry, ["button"], index, node_name,
+                                                                node_parent)
+
+            is_ancestor_of_select, select_id = add_to_hash_tree(select_ancestry, ["select"], index, node_name,
                                                                 node_parent)
 
             try:
-                cursor = layout_node_index.index(
-                    index)  # todo replace this with proper cursoring, ignoring the fact this is O(n^2) for the moment
+                if is_ancestor_of_select:
+                    tmp_index = select_id
+                    while tmp_index not in layout_node_index:
+                        tmp_index = parent[tmp_index]
+
+                    cursor = layout_node_index.index(tmp_index)
+                else:
+                    cursor = layout_node_index.index(index)
             except:
                 continue
 
@@ -254,9 +264,15 @@ class Crawler:
             element_attributes = find_attributes(
                 attributes[index], ["type", "placeholder", "aria-label", "name", "title", "alt", "role", "value"])
 
-            ancestor_exception = is_ancestor_of_anchor or is_ancestor_of_button
-            ancestor_node_key = (None if not ancestor_exception else
-                                 str(anchor_id) if is_ancestor_of_anchor else str(button_id))
+            ancestor_exception = is_ancestor_of_anchor or is_ancestor_of_button or is_ancestor_of_select
+            ancestor_node_key = None
+            if ancestor_exception:
+                if is_ancestor_of_anchor:
+                    ancestor_node_key = str(anchor_id)
+                elif is_ancestor_of_button:
+                    ancestor_node_key = str(button_id)
+                elif is_ancestor_of_select:
+                    ancestor_node_key = str(select_id)
             ancestor_node = (None if not ancestor_exception else child_nodes.setdefault(str(ancestor_node_key), []))
 
             if node_name == "#text" and ancestor_exception:
@@ -269,11 +285,13 @@ class Crawler:
                         == "submit") or node_name == "button" or element_attributes.get("role") == "button":
                     node_name = "button"
                     element_attributes.pop("type", None)  # prevent [button ... (button)..]
+                    element_attributes.pop("role", None)  # prevent [button ... (button)..]
+
                 if element_attributes.get("role") == "textbox":
                     node_name = "input"
 
                 for key in element_attributes:
-                    if ancestor_exception:
+                    if ancestor_exception and not is_ancestor_of_select:
                         ancestor_node.append({"type": "attribute", "key": key, "value": element_attributes[key]})
                     else:
                         meta_data.append(element_attributes[key])
@@ -291,7 +309,7 @@ class Crawler:
                     element_node_value = strings[text_index]
 
             # remove redudant elements
-            if ancestor_exception and (node_name != "a" and node_name != "button"):
+            if ancestor_exception and (node_name not in ["a", "button", "select"]):
                 continue
 
             elements_in_view_port.append({
@@ -346,9 +364,10 @@ class Crawler:
             converted_node_name = convert_name(node_name, is_clickable)
 
             # not very elegant, more like a placeholder
-            if ((converted_node_name != "button" or meta == "") and converted_node_name != "link" and
-                    converted_node_name != "input" and converted_node_name != "img" and
-                    converted_node_name != "textarea") and inner_text.strip() == "":
+            if converted_node_name not in ["button", "link", "input", "img", "textarea", "select"
+                                          ] and inner_text.strip() == "":
+                continue
+            elif converted_node_name == "button" and meta == "" and inner_text.strip() == "":
                 continue
 
             page_element_buffer[id_counter] = element
@@ -356,6 +375,8 @@ class Crawler:
             if inner_text != "":
                 elements_of_interest.append(f"""{converted_node_name} {id_counter}{meta} \"{inner_text}\"""")
             elif converted_node_name in ["input", "button"] or "alt" in meta:
+                elements_of_interest.append(f"""{converted_node_name} {id_counter}{meta}""")
+            elif converted_node_name == "select" and meta != "":
                 elements_of_interest.append(f"""{converted_node_name} {id_counter}{meta}""")
             else:
                 # print(f"""{converted_node_name} {id_counter}{meta}""")
@@ -503,7 +524,6 @@ class AsyncCrawler:
         node_types = nodes["nodeType"]
         node_names = nodes["nodeName"]
         is_clickable = set(nodes["isClickable"]["index"])
-        print(nodes.keys())
 
         text_value = nodes["textValue"]
         text_value_index = text_value["index"]
@@ -530,11 +550,11 @@ class AsyncCrawler:
         def convert_name(node_name, has_click_handler):
             if node_name == "a":
                 return "link"
-            if node_name == "input":
+            elif node_name == "input":
                 return "input"
-            if node_name == "img":
+            elif node_name == "img":
                 return "img"
-            if (node_name == "button" or has_click_handler):  # found pages that needed this quirk
+            elif (node_name in ["button", "option"] or has_click_handler):  # found pages that needed this quirk
                 return "button"
             else:
                 return "text"
@@ -640,6 +660,8 @@ class AsyncCrawler:
                         == "submit") or node_name == "button" or element_attributes.get("role") == "button":
                     node_name = "button"
                     element_attributes.pop("type", None)  # prevent [button ... (button)..]
+                    element_attributes.pop("role", None)  # prevent [button ... (button)..]
+
                 if element_attributes.get("role") == "textbox":
                     node_name = "input"
 

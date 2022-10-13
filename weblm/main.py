@@ -6,12 +6,14 @@
 #
 
 import os
+import re
+import time
 from multiprocessing import Pool
 
 import cohere
 
 from .controller import Command, Controller, Prompt
-from .crawler import Crawler
+from .crawler import URL_PATTERN, Crawler
 
 co = cohere.Client(os.environ.get("COHERE_KEY"))
 
@@ -43,13 +45,23 @@ if (__name__ == "__main__"):
         elif response == "success":
             controller.success()
             crawler, controller = reset()
+        elif response is not None and re.match(
+                f"goto {URL_PATTERN}",
+                response,
+        ):
+            url = re.match(URL_PATTERN, response[5:]).group(0)
+            response = None
+            crawler.go_to_page(url)
+            time.sleep(2)
 
         content = crawler.crawl()
+        print(content)
         response = controller.step(crawler.page.url, content, response)
 
         print(response)
 
         if isinstance(response, Command):
             crawler.run_cmd(str(response))
+            response = None
         elif isinstance(response, Prompt):
             response = input(str(response))
