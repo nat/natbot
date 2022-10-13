@@ -12,7 +12,7 @@ import cohere
 import numpy as np
 
 MAX_SEQ_LEN = 2000
-TYPEABLE = ["input", "select", "option"]
+TYPEABLE = ["input", "select"]
 CLICKABLE = ["link", "button"]
 
 prompt_template = """Given:
