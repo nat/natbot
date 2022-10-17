@@ -12,8 +12,10 @@ import cohere
 import numpy as np
 
 MAX_SEQ_LEN = 2000
+MAX_NUM_ELEMENTS = 100
 TYPEABLE = ["input", "select"]
 CLICKABLE = ["link", "button"]
+MODEL = "xlarge"
 
 prompt_template = """Given:
     (1) an objective that you are trying to achieve
@@ -41,7 +43,7 @@ $browser_content
 Previous actions:
 $previous_commands"""
 
-prioritization_template = """Choose the most relevant elements (links, buttons, and inputs) to achieve the objective below:
+prioritization_template = """Choose the most relevant elements on a webpage (links, buttons, selects and inputs) to achieve the objective below:
 Objective: $objective
 Relevant elements:
 {element}"""
@@ -76,7 +78,7 @@ def _fn(x):
         try:
             if len(self.co.tokenize(prompt)) > 2048:
                 prompt = truncate_left(self.co.tokenize, prompt)
-            return (self.co.generate(prompt=prompt, max_tokens=0, model="xlarge",
+            return (self.co.generate(prompt=prompt, max_tokens=0, model=MODEL,
                                      return_likelihoods=return_likelihoods).generations[0].likelihood, option)
         except cohere.error.CohereError as e:
             print(f"Cohere fucked up: {e}")
@@ -110,6 +112,8 @@ def split_list_by_separators(l: List[Any], separator_sequences: List[List[Any]])
                     tmp_seq = []
                     i += len(s)
                     break
+            else:
+                i += 1
         else:
             tmp_seq.append(item)
             i += 1
@@ -341,12 +345,13 @@ class Controller:
             "element": x
         } for x in page_elements],
                                                  topk=len(page_elements))
-        self._prioritized_elements = [x[1]["element"] for x in self._prioritized_elements]
+        self._prioritized_elements = [x[1]["element"] for x in self._prioritized_elements][:MAX_NUM_ELEMENTS]
         self._prioritized_elements_hash = hash(frozenset(page_elements))
         self._step = DialogueState.Action
         print(self._prioritized_elements)
 
     def pick_action(self, url: str, page_elements: List[str], response: str = None):
+        # this strategy for action selection does not work very well, TODO improve this
 
         if self._step not in [DialogueState.Action, DialogueState.ActionFeedback]:
             return
@@ -360,21 +365,14 @@ class Controller:
             if any(y in x for y in TYPEABLE for x in page_elements):
                 state, prompt = self._shorten_prompt(url, self._prioritized_elements, examples, target=MAX_SEQ_LEN)
 
-                print(state)
-                action = self.choose(
-                    prompt + "{action}",
-                    [
-                        {
-                            "action": " click",
-                            # "page_elements": click_prompt
-                        },
-                        {
-                            "action": " type",
-                            # "page_elements": type_prompt
-                        },
-                    ],
-                    topk=2)
-                print(action, (action[0][0] - action[1][0]) / -action[1][0])
+                action = self.choose(prompt + "{action}", [
+                    {
+                        "action": " click",
+                    },
+                    {
+                        "action": " type",
+                    },
+                ], topk=2)
 
                 # if the model is confident enough, just assume the suggested action is correct
                 if (action[0][0] - action[1][0]) / -action[1][0] > 1.:
@@ -420,7 +418,7 @@ class Controller:
 
                     print(len(self.co.tokenize(prompt + self._action + chosen_element)))
                     text = max(self.co.generate(prompt=prompt + self._action + chosen_element,
-                                                model="xlarge",
+                                                model=MODEL,
                                                 temperature=0.5,
                                                 num_generations=5,
                                                 max_tokens=num_tokens,
@@ -444,6 +442,7 @@ class Controller:
         if self._step == DialogueState.Command:
             if len(pruned_elements) == 1:
                 chosen_element = " " + " ".join(pruned_elements[0].split(" ")[:2])
+                self._chosen_elements = [{"id": chosen_element}]
             else:
                 state = self._construct_state(url, ["$elements"])
                 prompt = self._construct_prompt(state, examples)
@@ -479,6 +478,10 @@ class Controller:
                 examples = "\n".join(examples)
                 return Prompt(f"Examples:\n{examples}\n\n"
                               "Please respond with 'y' or 's'")
+            elif response == "prompt":
+                chosen_element = self._chosen_elements[0]["id"]
+                state, prompt = self._shorten_prompt(url, pruned_elements, examples, self._action, chosen_element)
+                return Prompt(f"{prompt}\n\nPlease respond with 'y' or 's'")
             elif response == "recrawl":
                 return Prompt(eval(f'f"""{user_prompt_3}"""'))
             elif response == "elements":

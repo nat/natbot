@@ -22,6 +22,7 @@ black_listed_elements = set([
 ])
 
 URL_PATTERN = r"https?:\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_\+.~#?&//=]*)"
+WINDOW_SIZE = {"width": 1280, "height": 1080}
 
 
 class Crawler:
@@ -34,7 +35,7 @@ class Crawler:
         )
 
         self.page = self.context.new_page()
-        self.page.set_viewport_size({"width": 1280, "height": 1080})
+        self.page.set_viewport_size(WINDOW_SIZE)
 
     def go_to_page(self, url):
         self.page.goto(url=url if "://" in url else "http://" + url)
@@ -66,7 +67,16 @@ class Crawler:
             x = element.get("center_x")
             y = element.get("center_y")
 
-            self.page.mouse.click(x, y)
+            height, width = WINDOW_SIZE["height"], WINDOW_SIZE["width"]
+
+            x_d = max(0, x - width)
+            x_d += 5 * int(x_d > 0)
+            y_d = max(0, y - height)
+            y_d += 5 * int(y_d > 0)
+
+            self.page.evaluate(f"() => window.scrollTo({x_d}, {y_d})")
+
+            self.page.mouse.click(x - x_d, y - y_d)
         else:
             print("Could not find element")
 
@@ -94,8 +104,8 @@ class Crawler:
         win_left_bound = page.evaluate("window.pageXOffset")
         win_width = page.evaluate("window.screen.width")
         win_height = page.evaluate("window.screen.height")
-        win_right_bound = win_left_bound + win_width
-        win_lower_bound = win_upper_bound + win_height
+        win_right_bound = win_left_bound + win_width * 2
+        win_lower_bound = win_upper_bound + win_height * 2
         document_offset_height = page.evaluate("document.body.offsetHeight")
         document_scroll_height = page.evaluate("document.body.scrollHeight")
 
@@ -119,7 +129,7 @@ class Crawler:
         tree = self.client.send(
             "DOMSnapshot.captureSnapshot",
             {
-                "computedStyles": [],
+                "computedStyles": ["display"],
                 "includeDOMRects": True,
                 "includePaintOrder": True
             },
@@ -147,6 +157,7 @@ class Crawler:
         layout = document["layout"]
         layout_node_index = layout["nodeIndex"]
         bounds = layout["bounds"]
+        styles = layout["styles"]
 
         cursor = 0
         html_elements_text = []
@@ -226,18 +237,15 @@ class Crawler:
                                                                 node_parent)
 
             try:
-                if is_ancestor_of_select:
-                    tmp_index = select_id
-                    while tmp_index not in layout_node_index:
-                        tmp_index = parent[tmp_index]
-
-                    cursor = layout_node_index.index(tmp_index)
-                else:
-                    cursor = layout_node_index.index(index)
+                cursor = layout_node_index.index(select_id) if is_ancestor_of_select else layout_node_index.index(index)
             except:
                 continue
 
             if node_name in black_listed_elements:
+                continue
+
+            style = map(lambda x: strings[x], styles[cursor])
+            if "none" in style:
                 continue
 
             [x, y, width, height] = bounds[cursor]

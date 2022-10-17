@@ -15,7 +15,7 @@ import cohere
 from .controller import Command, Controller, Prompt
 from .crawler import URL_PATTERN, Crawler
 
-co = cohere.Client(os.environ.get("COHERE_KEY"))
+co = cohere.Client(os.environ.get("COHERE_KEY"), check_api_key=False)
 
 if (__name__ == "__main__"):
 
