@@ -1,0 +1,18 @@
+[tool.poetry]
+name = "weblm"
+version = "0.1.0"
+description = ""
+authors = ["Aidan Gomez <aidan@secant.ai>"]
+license = "MIT"
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.8"
+cohere = "^2.6.1"
+numpy = "^1.23.4"
+playwright = "^1.27.1"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
