@@ -2,6 +2,7 @@ import asyncio
 import json
 import time
 from sys import platform
+from os.path import exists
 
 from playwright.async_api import async_playwright
 from playwright.sync_api import sync_playwright
@@ -794,10 +795,11 @@ class AsyncCrawler:
 
 
 def replace_special_fields(cmd):
-    with open("specials.json", "r") as fd:
-        specials = json.load(fd)
+    if exists("specials.json"):
+        with open("specials.json", "r") as fd:
+            specials = json.load(fd)
 
-    for k, v in specials.items():
-        cmd = cmd.replace(k, v)
+        for k, v in specials.items():
+            cmd = cmd.replace(k, v)
 
     return cmd

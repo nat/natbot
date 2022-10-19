@@ -16,3 +16,8 @@ Features:
 3. Install dependencies: `poetry install --no-root`
 4. Set up playwright: `poetry run playwright install`
 5. Run main: `poetry run python -m weblm.main`
+
+
+## Files to add
+1. `specials.json` - You should store sensitive information like "Password": "password" to avoid saving it to `examples.json`. 
+

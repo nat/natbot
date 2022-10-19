@@ -1,3 +1,4 @@
 specials.json
 examples.json
 */__pycache__
+poetry.lock
