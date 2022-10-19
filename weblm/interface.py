@@ -51,7 +51,7 @@ class MyClient(discord.Client):
 
     async def find_session(self, id, message):
         print(message.clean_content)
-        objective = message.clean_content
+        objective = message.clean_content.removeprefix("weblm ")
 
         if id not in self.sessions:
             print("did not find session")
@@ -68,7 +68,7 @@ class MyClient(discord.Client):
 
     async def respond_to_message(self, message):
         print(message.clean_content)
-        objective = message.clean_content
+        objective = message.clean_content.removeprefix("weblm ")
         crawler, controller = await self.find_session(message.id, message)
 
         if objective == "cancel":
@@ -110,7 +110,7 @@ class MyClient(discord.Client):
             return
 
         print(message.clean_content)
-        objective = message.clean_content
+        objective = message.clean_content.removeprefix("weblm ")
         crawler, controller = await self.find_session(message.channel.starter_message.id, message)
 
         if objective == "cancel":
@@ -147,7 +147,7 @@ class MyClient(discord.Client):
 
     async def respond_to_dm(self, message):
         print(message.clean_content)
-        objective = message.clean_content
+        objective = message.clean_content.removeprefix("weblm ")
         crawler, controller = await self.find_session(message.author.id, message)
 
         if objective == "cancel":
@@ -185,12 +185,13 @@ class MyClient(discord.Client):
     async def on_message(self, message):
         try:
             print(message)
-            if isinstance(
-                    message.channel,
-                    discord.TextChannel) and message.channel.id == 1026557845308723212 and message.author != self.user:
-                await self.respond_to_message(message)
-            elif isinstance(message.channel, discord.DMChannel) and message.author != self.user:
+            if isinstance(message.channel, discord.DMChannel) and message.author != self.user:
                 await self.respond_to_dm(message)
+            elif isinstance(
+                    message.channel, discord.TextChannel
+            ) and message.channel.id == 1026557845308723212 and message.author != self.user and message.clean_content.startswith(
+                    "weblm "):
+                await self.respond_to_message(message)
             elif isinstance(message.channel, discord.Thread
                            ) and message.channel.parent.id == 1026557845308723212 and message.author != self.user:
                 await self.respond_in_thread(message)
