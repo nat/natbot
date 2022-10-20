@@ -123,7 +123,7 @@ class MyClient(discord.Client):
             await msg.edit(suppress=True)
             return
         elif objective == "show":
-            path = controller.screenshot()
+            path = await crawler.screenshot()
             await message.channel.send(file=discord.File(path))
             return
 
@@ -164,7 +164,7 @@ class MyClient(discord.Client):
             await msg.edit(suppress=True)
             return
         elif objective == "show":
-            path = controller.screenshot()
+            path = await crawler.screenshot()
             await message.channel.send(file=discord.File(path))
             return
 
