@@ -427,6 +427,9 @@ class Crawler:
 
 class AsyncCrawler(Crawler):
 
+    def __init__(self, playwright) -> None:
+        self.playwright = playwright
+
     async def _init_browser(self):
         self.browser = await self.playwright.chromium.launch(headless=True,)
         self.context = await self.browser.new_context(
