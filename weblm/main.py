@@ -27,7 +27,7 @@ if (__name__ == "__main__"):
                   "(h) to view commands again\n(r) to run suggested command\n(o) change objective")
 
         objective = "Make a reservation for 2 at 7pm at bistro vida in menlo park"
-        print("\nWelcome to natbot! What is your objective?")
+        print("\nWelcome to WebLM! What is your objective?")
         i = input()
         if len(i) > 0:
             objective = i

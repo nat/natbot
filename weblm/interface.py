@@ -195,13 +195,13 @@ class MyClient(discord.Client):
             print(message)
             if isinstance(message.channel, discord.DMChannel) and message.author != self.user:
                 await self.respond_to_dm(message)
-            elif isinstance(
-                    message.channel, discord.TextChannel
-            ) and message.channel.id == 1026557845308723212 and message.author != self.user and message.clean_content.startswith(
-                    "weblm "):
+            elif isinstance(message.channel, discord.TextChannel) and message.channel.id in [
+                    1026557845308723212, 1032611829186306048
+            ] and message.author != self.user and message.clean_content.startswith("weblm "):
                 await self.respond_to_message(message)
-            elif isinstance(message.channel, discord.Thread
-                           ) and message.channel.parent.id == 1026557845308723212 and message.author != self.user:
+            elif isinstance(message.channel, discord.Thread) and message.channel.parent.id in [
+                    1026557845308723212, 1032611829186306048
+            ] and message.author != self.user:
                 await self.respond_in_thread(message)
         except Exception:
             print(f"Exception caught:\n{traceback.format_exc()}")
