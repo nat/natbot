@@ -6,7 +6,7 @@ from typing import Dict, Tuple
 
 import cohere
 import discord
-from discord import Embed
+from discord import Embed, File
 from discord.ext import commands
 from playwright.async_api import async_playwright
 
@@ -122,6 +122,10 @@ class MyClient(discord.Client):
             msg = await message.channel.send("🎉🎉🎉")
             await msg.edit(suppress=True)
             return
+        elif objective == "show":
+            path = controller.screenshot()
+            await message.channel.send(file=discord.File(path))
+            return
 
         while True:
             content = await crawler.crawl()
@@ -158,6 +162,10 @@ class MyClient(discord.Client):
             del self.sessions[message.author.id]
             msg = await message.channel.send("🎉🎉🎉")
             await msg.edit(suppress=True)
+            return
+        elif objective == "show":
+            path = controller.screenshot()
+            await message.channel.send(file=discord.File(path))
             return
 
         while True:

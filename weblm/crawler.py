@@ -440,6 +440,11 @@ class AsyncCrawler(Crawler):
         self.page = await self.context.new_page()
         await self.page.set_viewport_size({"width": 1280, "height": 1080})
 
+    async def screenshot(self):
+        _path = "screenshot.png"
+        await self.page.screenshot(path=_path)
+        return _path
+
     async def crawl(self):
         start = time.time()
 
