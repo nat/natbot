@@ -1,5 +1,6 @@
 import asyncio
 import json
+import re
 import time
 from os.path import exists
 from sys import platform
@@ -383,6 +384,9 @@ class Crawler:
 
             page_element_buffer[id_counter] = element
 
+            meta = re.sub('\s+', ' ', meta)
+            inner_text = re.sub('\s+', ' ', inner_text)
+
             if inner_text != "":
                 elements_of_interest.append(f"""{converted_node_name} {id_counter}{meta} \"{inner_text}\"""")
             elif converted_node_name in ["input", "button"] or "alt" in meta:
@@ -422,9 +426,6 @@ class Crawler:
 
 
 class AsyncCrawler(Crawler):
-
-    def __init__(self, playwright) -> None:
-        self.playwright = playwright
 
     async def _init_browser(self):
         self.browser = await self.playwright.chromium.launch(headless=True,)

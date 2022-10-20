@@ -43,8 +43,9 @@ $browser_content
 Previous actions:
 $previous_commands"""
 
-prioritization_template = """Choose the most relevant elements on a webpage (links, buttons, selects and inputs) to achieve the objective below:
+prioritization_template = """Here are the most relevant elements on the webpage (links, buttons, selects and inputs) to achieve the objective below:
 Objective: $objective
+URL: $url
 Relevant elements:
 {element}"""
 
@@ -337,9 +338,10 @@ class Controller:
 
         return state, prompt
 
-    def _generate_prioritization(self, page_elements: List[str]):
+    def _generate_prioritization(self, page_elements: List[str], url: str):
         prioritization = prioritization_template
         prioritization = prioritization.replace("$objective", self.objective)
+        prioritization = prioritization.replace("$url", url)
 
         self._prioritized_elements = self.choose(prioritization, [{
             "element": x
@@ -514,7 +516,7 @@ class Controller:
         self._step = DialogueState.Action if self._step == DialogueState.Unset else self._step
 
         if self._prioritized_elements is None or self._prioritized_elements_hash != hash(frozenset(page_elements)):
-            self._generate_prioritization(page_elements)
+            self._generate_prioritization(page_elements, url)
 
         action_or_prompt = self.pick_action(url, page_elements, response)
 
