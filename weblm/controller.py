@@ -117,6 +117,10 @@ def truncate_left(tokenize, prompt, *rest_of_prompt, limit=2048):
 
 
 def split_list_by_separators(l: List[Any], separator_sequences: List[List[Any]]) -> List[List[Any]]:
+    """Split a list by a subsequence.
+    
+    split_list_by_separators(range(7), [[2, 3], [5]]) == [[0, 1], [4], [6]]
+    """
     split_list: List[List[Any]] = []
     tmp_seq: List[Any] = []
 
@@ -172,6 +176,15 @@ class DialogueState(Enum):
 
 
 class Controller:
+    """A Cohere-powered controller that takes in a browser state and produces and action.
+
+    The basic outline of this Controller's strategy is:
+    1. receive page content from browser
+    2. prioritise elements on page based on how relevant they are to the objective
+    3. look up similar states from the past
+    4. choose between clicking and typing
+    5. choose what element to click or what element to type in
+    """
 
     def __init__(self, co: cohere.Client, objective: str):
         """
@@ -227,6 +240,22 @@ class Controller:
                        options: List[Dict[str, str]],
                        group_size: int = 10,
                        topk: int = 1) -> List[Dict[str, str]]:
+        """A hacky way of choosing the most likely option, while staying within sequence length constraints
+
+        Algo:
+        1. chunk `options` into groups of `group_size`
+        2. within each group perform a self.choose to get the topk elements (we'll have num_groups*topk elements after this)
+        3. flatten and repeat recursively until the number of options is down to topk
+
+        Args:
+            template (str): the prompt template with f-string style template tags 
+            options (List[Dict[str, str]]): a list of dictionaries containing key-value replacements of the template tags
+            group_size (int, optional): The size of each group of options to select from. Defaults to 10.
+            topk (int, optional): The topk most likely options to return. Defaults to 1.
+
+        Returns:
+            List[Dict[str, str]]: The `topk` most likely elements in `options` according to the model
+        """
         num_options = len(options)
         num_groups = int(math.ceil(num_options / group_size))
 
@@ -251,6 +280,7 @@ class Controller:
             return self.choose_element(template, choices, group_size, topk)
 
     def gather_examples(self, state: str, topk: int = 5) -> List[str]:
+        """Simple semantic search over a file of past interactions to find the most similar ones."""
         with open("examples.json", "r") as fd:
             examples = json.load(fd)
 
@@ -471,7 +501,7 @@ class Controller:
 
                 state, prompt = self._shorten_prompt(url, ["$elements"], examples, self._action)
 
-                group_size = 40
+                group_size = 20
                 self._chosen_elements = self.choose_element(
                     prompt + self._action + "{id}",
                     list(map(lambda x: {

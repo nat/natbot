@@ -27,6 +27,17 @@ URL_PATTERN = r"https?:\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{
 WINDOW_SIZE = {"width": 1280, "height": 1080}
 
 
+def replace_special_fields(cmd):
+    if exists("specials.json"):
+        with open("specials.json", "r") as fd:
+            specials = json.load(fd)
+
+        for k, v in specials.items():
+            cmd = cmd.replace(k, v)
+
+    return cmd
+
+
 class Crawler:
 
     def __init__(self):
@@ -76,7 +87,8 @@ class Crawler:
             y_d = max(0, y - height)
             y_d += 5 * int(y_d > 0)
 
-            self.page.evaluate(f"() => window.scrollTo({x_d}, {y_d})")
+            if x_d or y_d:
+                self.page.evaluate(f"() => window.scrollTo({x_d}, {y_d})")
 
             self.page.mouse.click(x - x_d, y - y_d)
         else:
@@ -500,7 +512,17 @@ class AsyncCrawler(Crawler):
             x = element.get("center_x")
             y = element.get("center_y")
 
-            await self.page.mouse.click(x, y)
+            height, width = WINDOW_SIZE["height"], WINDOW_SIZE["width"]
+
+            x_d = max(0, x - width)
+            x_d += 5 * int(x_d > 0)
+            y_d = max(0, y - height)
+            y_d += 5 * int(y_d > 0)
+
+            if x_d or y_d:
+                await self.page.evaluate(f"() => window.scrollTo({x_d}, {y_d})")
+
+            await self.page.mouse.click(x - x_d, y - y_d)
         else:
             print("Could not find element")
 
@@ -536,14 +558,3 @@ class AsyncCrawler(Crawler):
             raise Exception(f"Invalid command: {cmd}")
 
         time.sleep(2)
-
-
-def replace_special_fields(cmd):
-    if exists("specials.json"):
-        with open("specials.json", "r") as fd:
-            specials = json.load(fd)
-
-        for k, v in specials.items():
-            cmd = cmd.replace(k, v)
-
-    return cmd
