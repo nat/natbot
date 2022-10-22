@@ -10,7 +10,7 @@ from discord import Embed, File
 from discord.ext import commands
 from playwright.async_api import async_playwright
 
-from .controller import Command, Controller, Prompt
+from .controller import Command, Controller, Prompt, help_msg
 from .crawler import AsyncCrawler
 
 co = cohere.Client(os.environ.get("COHERE_KEY"))
@@ -74,6 +74,10 @@ class MyClient(discord.Client):
         if objective == "cancel":
             del self.sessions[message.id]
             return
+        elif objective == "help":
+            msg = await message.channel.send(help_msg)
+            await msg.edit(suppress=True)
+            return
         elif objective == "success":
             controller.success()
             del self.sessions[message.channel.starter_message.id]
@@ -122,6 +126,10 @@ class MyClient(discord.Client):
             msg = await message.channel.send("🎉🎉🎉")
             await msg.edit(suppress=True)
             return
+        elif objective == "help":
+            msg = await message.channel.send(help_msg)
+            await msg.edit(suppress=True)
+            return
         elif objective == "show":
             path = await crawler.screenshot()
             await message.channel.send(file=discord.File(path))
@@ -161,6 +169,10 @@ class MyClient(discord.Client):
             controller.success()
             del self.sessions[message.author.id]
             msg = await message.channel.send("🎉🎉🎉")
+            await msg.edit(suppress=True)
+            return
+        elif objective == "help":
+            msg = await message.channel.send(help_msg)
             await msg.edit(suppress=True)
             return
         elif objective == "show":
