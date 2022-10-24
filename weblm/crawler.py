@@ -305,8 +305,8 @@ class Crawler:
                     continue
                 ancestor_node.append({"type": "type", "value": text})
             else:
-                if (node_name == "input" and element_attributes.get("type")
-                        == "submit") or node_name == "button" or element_attributes.get("role") == "button":
+                if (node_name == "input" and element_attributes.get("type") == "submit"
+                   ) or node_name == "button" or element_attributes.get("role") == "button":
                     node_name = "button"
                     element_attributes.pop("type", None)  # prevent [button ... (button)..]
                     element_attributes.pop("role", None)  # prevent [button ... (button)..]
