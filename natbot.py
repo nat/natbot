@@ -544,7 +544,11 @@ if (
 ):
 	_crawler = Crawler()
 	openai.api_key = os.environ.get("OPENAI_API_KEY")
-
+	# use text-generator.io instead of OpenAI if there is a environment var set
+	text_generator_api_key = os.getenv("TEXTGENERATOR_API_KEY")
+	if text_generator_api_key:
+		openai.api_key = text_generator_api_key
+		openai.api_base = "https://api.text-generator.io"
 	def print_help():
 		print(
 			"(g) to visit url\n(u) scroll up\n(d) scroll down\n(c) to click\n(t) to type\n" +
