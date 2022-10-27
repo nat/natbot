@@ -12,9 +12,13 @@ import openai
 import os
 
 quiet = False
-if argv[1] == '-q' or argv[1] == '--quiet':
-    quiet = True
-    print("Running in quiet mode (HTML and other content hidden);\nexercise caution when running suggested commands.")
+if len(argv) >= 2:
+	if argv[1] == '-q' or argv[1] == '--quiet':
+		quiet = True
+		print(
+			"Running in quiet mode (HTML and other content hidden); \n"
+			+ "exercise caution when running suggested commands."
+		)
 
 prompt_template = """
 You are an agent controlling a browser. You are given:
