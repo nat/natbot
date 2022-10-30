@@ -46,7 +46,8 @@ class MyClient(discord.Client):
         print(f"We have logged in as {self.user}")
 
         for guild in self.guilds:
-            print(f"{self.user} is connected to the following guild:\n" f"{guild.name}(id: {guild.id})")
+            print(f"{self.user} is connected to the following guild:\n"
+                  f"{guild.name}(id: {guild.id})")
 
     async def find_session(self, id, message):
         print(message.clean_content)
