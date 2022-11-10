@@ -112,13 +112,13 @@ user_prompt_1 = ("Given web state:\n{state}"
                  "\n**I think I should{action}**"
                  "\n\t(y) proceed with this action"
                  "\n\t(n) do the other action" + user_prompt_end)
-user_prompt_2 = ("Given state:\n{self._construct_state(url, pruned_elements)}"
+user_prompt_2 = ("Given state:\n{self._construct_state(self.objective, url, pruned_elements, self.previous_commands)}"
                  "\n\nSuggested command: {cmd}.\n\t(y) accept and continue"
                  "\n\t(s) save example, accept, and continue"
                  "\n{other_options}"
                  "\n\t(back) choose a different action"
                  "\n\t(enter a new command) type your own command to replace the model's suggestion" + user_prompt_end)
-user_prompt_3 = ("Given state:\n{self._construct_state(url, pruned_elements)}"
+user_prompt_3 = ("Given state:\n{self._construct_state(self.objective, url, pruned_elements, self.previous_commands)}"
                  "\n\nSuggested command: {self._cmd}.\n\t(y) accept and continue"
                  "\n\t(s) save example, accept, and continue"
                  "\n\t(back) choose a different action"
@@ -244,7 +244,7 @@ class Controller:
         self.co = co
         self.objective = objective
         self.previous_commands: List[str] = []
-        self.moments: List[Tuple[str, str, str]] = []
+        self.moments: List[Tuple[str, str, str, List[str]]] = []
         self.user_responses: DefaultDict[str, int] = defaultdict(int)
         self.reset_state()
 
@@ -260,10 +260,15 @@ class Controller:
         self._pruned_prioritized_elements = None
         self._prioritized_elements_hash = None
         self._page_elements = None
+        self._error = None
 
     def success(self):
-        for url, elements, command in self.moments:
-            self._save_example(url=url, elements=elements, command=command)
+        for url, elements, command, previous_commands in self.moments:
+            self._save_example(objective=self.objective,
+                               url=url,
+                               elements=elements,
+                               command=command,
+                               previous_commands=previous_commands)
 
     def choose(self,
                template: str,
@@ -348,17 +353,28 @@ class Controller:
         ind = np.argsort(scores)[-topk:]
         examples = np.array(examples)[ind]
 
-        return examples
+        states = []
+        for i, h in enumerate(history):
+            if i in ind:
+                if all(x in h for x in ["objective", "url", "elements", "previous_commands"]):
+                    states.append(
+                        self._construct_state(objective=h["objective"],
+                                              url=h["url"],
+                                              page_elements=h["elements"],
+                                              previous_commands=h["previous_commands"]))
+                else:
+                    states.append(h["example"])
 
-    def _construct_prev_cmds(self) -> str:
-        return "\n".join(
-            f"{i+1}. {x}" for i, x in enumerate(self.previous_commands)) if self.previous_commands else "None"
+        return states
 
-    def _construct_state(self, url: str, page_elements: List[str]) -> str:
+    def _construct_prev_cmds(self, previous_commands: List[str]) -> str:
+        return "\n".join(f"{i+1}. {x}" for i, x in enumerate(previous_commands)) if previous_commands else "None"
+
+    def _construct_state(self, objective: str, url: str, page_elements: List[str], previous_commands: List[str]) -> str:
         state = state_template
-        state = state.replace("$objective", self.objective)
+        state = state.replace("$objective", objective)
         state = state.replace("$url", url[:100])
-        state = state.replace("$previous_commands", self._construct_prev_cmds())
+        state = state.replace("$previous_commands", self._construct_prev_cmds(previous_commands))
         return state.replace("$browser_content", "\n".join(page_elements))
 
     def _construct_prompt(self, state: str, examples: List[str]) -> str:
@@ -366,8 +382,8 @@ class Controller:
         prompt = prompt.replace("$examples", "\n\n".join(examples))
         return prompt.replace("$state", state)
 
-    def _save_example(self, url: str, elements: List[str], command: str):
-        state = self._construct_state(url, elements[:MAX_NUM_ELEMENTS])
+    def _save_example(self, objective: str, url: str, elements: List[str], command: str, previous_commands: List[str]):
+        state = self._construct_state(objective, url, elements[:MAX_NUM_ELEMENTS], previous_commands)
         example = ("Example:\n"
                    f"{state}\n"
                    f"Next Command: {command}\n"
@@ -387,6 +403,8 @@ class Controller:
             "url": url,
             "elements": elements,
             "command": command,
+            "previous_commands": previous_commands,
+            "objective": objective,
         })
 
         with open("examples_tmp.json", "w") as fd:
@@ -421,8 +439,15 @@ class Controller:
                 wr.writerow(keys_to_save)
                 wr.writerow([self.user_responses[key] for key in keys_to_save])
 
-    def _shorten_prompt(self, url, elements, examples, *rest_of_prompt, target: int = MAX_SEQ_LEN):
-        state = self._construct_state(url, elements)
+    def _shorten_prompt(self,
+                        objective: str,
+                        url: str,
+                        elements: List[str],
+                        previous_commands: List[str],
+                        examples: List[str],
+                        *rest_of_prompt,
+                        target: int = MAX_SEQ_LEN):
+        state = self._construct_state(objective, url, elements, previous_commands)
         prompt = self._construct_prompt(state, examples)
 
         tokenized_prompt = self.co.tokenize(prompt + "".join(rest_of_prompt))
@@ -441,7 +466,7 @@ class Controller:
         length_of_prompt = len(tokenized_prompt)
 
         def _fn(i, j):
-            state = self._construct_state(url, elements[:len(elements) - i])
+            state = self._construct_state(objective, url, elements[:len(elements) - i], previous_commands)
             prompt = self._construct_prompt(state, examples[j:])
 
             return state, prompt
@@ -494,7 +519,7 @@ class Controller:
         if self._step not in [DialogueState.Action, DialogueState.ActionFeedback]:
             return
 
-        state = self._construct_state(url, self._pruned_prioritized_elements)
+        state = self._construct_state(self.objective, url, self._pruned_prioritized_elements, self.previous_commands)
         examples = self.gather_examples(state)
         prompt = self._construct_prompt(state, examples)
 
@@ -505,7 +530,12 @@ class Controller:
                     filter(lambda x: any(x.startswith(y) for y in CLICKABLE + TYPEABLE),
                            self._pruned_prioritized_elements))
 
-                state, prompt = self._shorten_prompt(url, elements, examples, target=MAX_SEQ_LEN)
+                state, prompt = self._shorten_prompt(self.objective,
+                                                     url,
+                                                     elements,
+                                                     self.previous_commands,
+                                                     examples,
+                                                     target=MAX_SEQ_LEN)
 
                 action = self.choose(prompt + "{action}", [
                     {
@@ -582,7 +612,7 @@ class Controller:
         return (self._action + chosen_element + text).strip()
 
     def generate_command(self, url: str, pruned_elements: List[str], response: str = None):
-        state = self._construct_state(url, pruned_elements)
+        state = self._construct_state(self.objective, url, pruned_elements, self.previous_commands)
         examples = self.gather_examples(state)
         prompt = self._construct_prompt(state, examples)
 
@@ -591,10 +621,11 @@ class Controller:
                 chosen_element = " " + " ".join(pruned_elements[0].split(" ")[:2])
                 self._chosen_elements = [{"id": chosen_element}]
             else:
-                state = self._construct_state(url, ["$elements"])
+                state = self._construct_state(self.objective, url, ["$elements"], self.previous_commands)
                 prompt = self._construct_prompt(state, examples)
 
-                state, prompt = self._shorten_prompt(url, ["$elements"], examples, self._action)
+                state, prompt = self._shorten_prompt(self.objective, url, ["$elements"], self.previous_commands,
+                                                     examples, self._action)
 
                 group_size = 20
                 self._chosen_elements = self.choose_element(
@@ -607,10 +638,11 @@ class Controller:
                     topk=5)
                 chosen_element = self._chosen_elements[0]["id"]
 
-                state = self._construct_state(url, pruned_elements)
+                state = self._construct_state(self.objective, url, pruned_elements, self.previous_commands)
                 prompt = self._construct_prompt(state, examples)
 
-                state, prompt = self._shorten_prompt(url, pruned_elements, examples, self._action, chosen_element)
+                state, prompt = self._shorten_prompt(self.objective, url, pruned_elements, self.previous_commands,
+                                                     examples, self._action, chosen_element)
 
             cmd = self._get_cmd_prediction(prompt, chosen_element)
 
@@ -626,7 +658,8 @@ class Controller:
                               "Please respond with 'y' or 's'")
             elif response == "prompt":
                 chosen_element = self._chosen_elements[0]["id"]
-                state, prompt = self._shorten_prompt(url, pruned_elements, examples, self._action, chosen_element)
+                state, prompt = self._shorten_prompt(self.objective, url, pruned_elements, self.previous_commands,
+                                                     examples, self._action, chosen_element)
                 return Prompt(f"{prompt}\n\nPlease respond with 'y' or 's'")
             elif response == "recrawl":
                 return Prompt(eval(f'f"""{user_prompt_3}"""'))
@@ -640,7 +673,8 @@ class Controller:
 
             if re.match(r'\d+', response):
                 chosen_element = self._chosen_elements[int(response) - 1]["id"]
-                state, prompt = self._shorten_prompt(url, pruned_elements, examples, self._action, chosen_element)
+                state, prompt = self._shorten_prompt(self.objective, url, pruned_elements, self.previous_commands,
+                                                     examples, self._action, chosen_element)
                 self._cmd = self._get_cmd_prediction(prompt, chosen_element)
                 if "type" in self._action:
                     return Prompt(eval(f'f"""{user_prompt_3}"""'))
@@ -652,9 +686,13 @@ class Controller:
                 return Prompt(f"Invalid command '{self._cmd}'. Must match regex '{cmd_pattern}'. Try again...")
 
             if response == "s":
-                self._save_example(url=url, elements=self._prioritized_elements, command=self._cmd)
+                self._save_example(objective=self.objective,
+                                   url=url,
+                                   elements=self._prioritized_elements,
+                                   command=self._cmd,
+                                   previous_commands=self.previous_commands)
 
-        self.moments.append((url, self._prioritized_elements, self._cmd))
+        self.moments.append((url, self._prioritized_elements, self._cmd, self.previous_commands.copy()))
         self.previous_commands.append(self._cmd)
 
         cmd = Command(self._cmd.strip())
@@ -662,24 +700,43 @@ class Controller:
         return cmd
 
     def step(self, url: str, page_elements: List[str], response: str = None) -> Union[Prompt, Command]:
-        self._step = DialogueState.Action if self._step == DialogueState.Unset else self._step
-        self._page_elements = page_elements
+        if self._error is not None:
+            if response == "c":
+                self._error = None
+            elif response == "success":
+                self.success()
+                raise self._error
+            elif response == "cancel":
+                raise self._error
+            else:
+                return Prompt("Response not recognized"
+                              "\nPlease choose one of the following:"
+                              "\n\t(c) ignore exception and continue" + user_prompt_end)
 
-        if self._prioritized_elements is None or self._prioritized_elements_hash != hash(frozenset(page_elements)):
-            self._generate_prioritization(page_elements, url)
+        try:
+            self._step = DialogueState.Action if self._step == DialogueState.Unset else self._step
+            self._page_elements = page_elements
 
-        self.user_responses[response] += 1
-        self._construct_responses()
-        action_or_prompt = self.pick_action(url, page_elements, response)
+            if self._prioritized_elements is None or self._prioritized_elements_hash != hash(frozenset(page_elements)):
+                self._generate_prioritization(page_elements, url)
 
-        if isinstance(action_or_prompt, Prompt):
-            return action_or_prompt
+            self.user_responses[response] += 1
+            self._construct_responses()
+            action_or_prompt = self.pick_action(url, page_elements, response)
 
-        if "click" in self._action:
-            pruned_elements = list(
-                filter(lambda x: any(x.startswith(y) for y in CLICKABLE), self._pruned_prioritized_elements))
-        elif "type" in self._action:
-            pruned_elements = list(
-                filter(lambda x: any(x.startswith(y) for y in TYPEABLE), self._pruned_prioritized_elements))
+            if isinstance(action_or_prompt, Prompt):
+                return action_or_prompt
 
-        return self.generate_command(url, pruned_elements, response)
+            if "click" in self._action:
+                pruned_elements = list(
+                    filter(lambda x: any(x.startswith(y) for y in CLICKABLE), self._pruned_prioritized_elements))
+            elif "type" in self._action:
+                pruned_elements = list(
+                    filter(lambda x: any(x.startswith(y) for y in TYPEABLE), self._pruned_prioritized_elements))
+
+            return self.generate_command(url, pruned_elements, response)
+        except Exception as e:
+            self._error = e
+            return Prompt(f"Caught exception:\n{e}"
+                          "\nPlease choose one of the following:"
+                          "\n\t(c) ignore exception and continue" + user_prompt_end)
