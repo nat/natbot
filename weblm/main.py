@@ -43,7 +43,7 @@ if (__name__ == "__main__"):
     while True:
         if response == "cancel":
             controller.save_responses()
-            crawler, controller = reset()
+            # crawler, controller = reset()
         elif response == "success":
             controller.success()
             controller.save_responses()

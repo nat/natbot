@@ -247,7 +247,7 @@ class Crawler:
 
             is_ancestor_of_anchor, anchor_id = add_to_hash_tree(anchor_ancestry, ["a"], index, node_name, node_parent)
 
-            is_ancestor_of_button, button_id = add_to_hash_tree(button_ancestry, ["button"], index, node_name,
+            is_ancestor_of_button, button_id = add_to_hash_tree(button_ancestry, ["button", "radio"], index, node_name,
                                                                 node_parent)
 
             is_ancestor_of_select, select_id = add_to_hash_tree(select_ancestry, ["select"], index, node_name,
@@ -309,7 +309,7 @@ class Crawler:
                 ancestor_node.append({"type": "type", "value": text})
             else:
                 if (node_name == "input" and element_attributes.get("type")
-                        == "submit") or node_name == "button" or element_attributes.get("role") == "button":
+                        == "submit") or node_name == "button" or element_attributes.get("role") in ["button", "radio"]:
                     node_name = "button"
                     element_attributes.pop("type", None)  # prevent [button ... (button)..]
                     element_attributes.pop("role", None)  # prevent [button ... (button)..]
