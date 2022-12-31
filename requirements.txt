@@ -1,0 +1,4 @@
+openai==0.25.0
+pip==20.2.3
+playwright==1.29.0
+pytest_playwright==0.3.0
