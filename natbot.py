@@ -297,6 +297,8 @@ class Crawler:
 				return "input"
 			if node_name == "img":
 				return "img"
+			if node_name == "textarea":
+				return "textarea"
 			if (
 				node_name == "button" or has_click_handler
 			):  # found pages that needed this quirk
