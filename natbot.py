@@ -4,12 +4,15 @@
 #
 # Set OPENAI_API_KEY to your API key, and then run this from a terminal.
 #
-
-from playwright.sync_api import sync_playwright
+import base64
+import os
 import time
 from sys import argv, exit, platform
+
 import openai
-import os
+from playwright.sync_api import sync_playwright
+
+openai_client = openai.Client()
 
 quiet = False
 if len(argv) >= 2:
@@ -169,7 +172,7 @@ class Crawler:
 				headless=False,
 			)
 		)
-
+		self.use_screenshot = True
 		self.page = self.browser.new_page()
 		self.page.set_viewport_size({"width": 1280, "height": 1080})
 
@@ -202,7 +205,7 @@ class Crawler:
 		if element:
 			x = element.get("center_x")
 			y = element.get("center_y")
-			
+
 			self.page.mouse.click(x, y)
 		else:
 			print("Could not find element")
@@ -228,7 +231,7 @@ class Crawler:
 		win_scroll_x 		= page.evaluate("window.scrollX")
 		win_scroll_y 		= page.evaluate("window.scrollY")
 		win_upper_bound 	= page.evaluate("window.pageYOffset")
-		win_left_bound 		= page.evaluate("window.pageXOffset") 
+		win_left_bound 		= page.evaluate("window.pageXOffset")
 		win_width 			= page.evaluate("window.screen.width")
 		win_height 			= page.evaluate("window.screen.height")
 		win_right_bound 	= win_left_bound + win_width
@@ -430,7 +433,7 @@ class Crawler:
 					element_attributes.pop(
 						"type", None
 					)  # prevent [button ... (button)..]
-				
+
 				for key in element_attributes:
 					if ancestor_exception:
 						ancestor_node.append({
@@ -493,7 +496,7 @@ class Crawler:
 
 			inner_text = f"{node_value} " if node_value else ""
 			meta = ""
-			
+
 			if node_index in child_nodes:
 				for child in child_nodes.get(node_index):
 					entry_type = child.get('type')
@@ -526,7 +529,7 @@ class Crawler:
 
 			page_element_buffer[id_counter] = element
 
-			if inner_text != "": 
+			if inner_text != "":
 				elements_of_interest.append(
 					f"""<{converted_node_name} id={id_counter}{meta}>{inner_text}</{converted_node_name}>"""
 				)
@@ -539,6 +542,12 @@ class Crawler:
 		print("Parsing time: {:0.2f} seconds".format(time.time() - start))
 		return elements_of_interest
 
+	def take_screenshot(self):
+		if self.use_screenshot:
+			jpeg_bytes = self.page.screenshot(type="jpeg")
+			return base64.b64encode(jpeg_bytes)
+
+
 if (
 	__name__ == "__main__"
 ):
@@ -547,18 +556,34 @@ if (
 
 	def print_help():
 		print(
-			"(g) to visit url\n(u) scroll up\n(d) scroll down\n(c) to click\n(t) to type\n" +
+			"(g) to visit url\n(u) scroll up\n(d) scroll down\n(c) to click\n(t) to type\n(s) to take screenshot\n" +
 			"(h) to view commands again\n(r/enter) to run suggested command\n(o) change objective"
 		)
 
-	def get_gpt_command(objective, url, previous_command, browser_content):
+
+	def get_gpt_command(objective, url, previous_command, browser_content, screenshot):
 		prompt = prompt_template
 		prompt = prompt.replace("$objective", objective)
 		prompt = prompt.replace("$url", url[:100])
 		prompt = prompt.replace("$previous_command", previous_command)
 		prompt = prompt.replace("$browser_content", browser_content[:4500])
-		response = openai.Completion.create(model="text-davinci-002", prompt=prompt, temperature=0.5, best_of=10, n=3, max_tokens=50)
-		return response.choices[0].text
+		content = [
+			{"type": "text", "text": prompt},
+		]
+		if screenshot:
+			content.append(
+				{"type": "image_url", "image_url": {
+					"url": f"data:image/jpeg;base64,{screenshot.decode('utf-8')}"
+				}}
+			)
+
+		response = openai_client.chat.completions.create(
+			model="gpt-4o", temperature=0.5, max_tokens=50,
+			messages=[{
+				"role": "user",
+				"content": content,
+			}], )
+		return response.choices[0].message.content
 
 	def run_cmd(cmd):
 		cmd = cmd.split("\n")[0]
@@ -597,8 +622,9 @@ if (
 	try:
 		while True:
 			browser_content = "\n".join(_crawler.crawl())
+			screenshot = _crawler.take_screenshot()
 			prev_cmd = gpt_cmd
-			gpt_cmd = get_gpt_command(objective, _crawler.page.url, prev_cmd, browser_content)
+			gpt_cmd = get_gpt_command(objective, _crawler.page.url, prev_cmd, browser_content, screenshot)
 			gpt_cmd = gpt_cmd.strip()
 
 			if not quiet:
@@ -632,6 +658,8 @@ if (
 				time.sleep(1)
 			elif command == "o":
 				objective = input("Objective:")
+			elif command == "s":
+				_crawler.take_screenshot()
 			else:
 				print_help()
 	except KeyboardInterrupt:
